@@ -121,7 +121,6 @@ public:
 
 void flood_fill (cv::Mat& img, std::vector<cv::Point>& V, int x, int y) {
     if (img.at<uchar>(x,y) == 0) return;
-
     img.at<uchar>(x,y) = 0;
     V.push_back(cv::Point(x,y));
     if (x > 0) flood_fill(img, V, x-1, y);
@@ -138,7 +137,7 @@ std::vector<Segment> seg_image(cv::Mat& img) {
         for (int j = 0; j < img.cols; ++j) {
             std::vector<cv::Point> V;
             flood_fill(tmp, V, i, j);
-            if (V.size() > 100) {
+            if (V.size() > 200) {
                 Segment s(V, img);
                 S.push_back(s);
             }
@@ -200,7 +199,6 @@ void draw_segment(Segment& s, cv::Mat& img) {
     int max_x = s.get_max_x();
     int min_x = s.get_min_x();
 
-
     for (int i = min_x; i <= max_x; ++i) {
         img.at<cv::Vec3b>(i,max_y)[0] = 0;    
         img.at<cv::Vec3b>(i,max_y)[1] = 255;    
@@ -220,7 +218,6 @@ void draw_segment(Segment& s, cv::Mat& img) {
         img.at<cv::Vec3b>(max_x, i)[1] = 255;    
         img.at<cv::Vec3b>(max_x, i)[2] = 0;    
     }
-    
 }
 
 bool identify_condition(Segment& s) {
@@ -236,10 +233,8 @@ bool identify_condition(Segment& s) {
 
 // 0.18, 0.74
 void identify_segment(cv::Mat& img, cv::Mat& original_image, Segment& s) {
-    if (s.points_.size() > 500 && s.points_.size() < 5000) {
-        if (s.circle_moment_ > 0.37 && s.circle_moment_ < 0.47 ) {
-            draw_segment(s, original_image);
-        }
+    if (identify_condition(s)) {
+        draw_segment(s, original_image);
     }
 }
 
@@ -277,7 +272,7 @@ void run_for_all_images() {
 }
 
 void run_for_test() {
-    std::string image_path = cv::samples::findFile("./images/pobr-input8-a.jpg");
+    std::string image_path = cv::samples::findFile("./images/pobr-input2-a.jpg");
     cv::Mat img = cv::imread(image_path, cv::IMREAD_COLOR);
     if(img.empty()) {
         std::cout << "Could not read the image: " << image_path << std::endl;
@@ -289,8 +284,8 @@ void run_for_test() {
 } 
 
 int main() {
+    run_for_test();
     //run_for_all_images();
-    run_for_all_images();
     int k = cv::waitKey(0); // Wait for a keystroke in the window
     return 0;
 }
