@@ -18,16 +18,25 @@ cv::Mat copy_image(cv::Mat& img) {
     return tmp;
 }
 
+class Point {
+public:
+    int x;
+    int y;
+
+    Point () {}
+    Point(int x_, int y_) : x(x_), y(y_) {}
+};
+
 class Segment {
 public:
-    Segment(std::vector<cv::Point> V, cv::Mat& img) : points_(V){
+    Segment(std::vector<Point> V, cv::Mat& img) : points_(V){
         contour_ = get_contour(img);        
         circle_moment_ = calc_circle_moment();
         w0_ = W0();
     }
     
-    std::vector<cv::Point> points_;
-    std::vector<cv::Point> contour_;
+    std::vector<Point> points_;
+    std::vector<Point> contour_;
     double circle_moment_;
     double w0_;
 
@@ -75,8 +84,8 @@ public:
         return maxValue;
     }
 
-    std::pair<cv::Point, double> create_min_circle() {
-        cv::Point center;
+    std::pair<Point, double> create_min_circle() {
+        Point center;
 
         double max_distance = 0;
         for (int i = 0; i < contour_.size(); ++i) {
@@ -90,16 +99,16 @@ public:
                 }
             }
         }
-        return std::make_pair<cv::Point, double>(cv::Point(center.y, center.x), max_distance/2);
+        return std::make_pair<Point, double>(Point(center.y, center.x), max_distance/2);
     }
 
     double calc_circle_moment() {
-        std::pair<cv::Point, double> circle = create_min_circle();
+        std::pair<Point, double> circle = create_min_circle();
         return points_.size() / (M_PI * pow(circle.second,2));
     }
 
-    std::vector<cv::Point> get_contour(cv::Mat& img) {
-        std::vector<cv::Point> V;
+    std::vector<Point> get_contour(cv::Mat& img) {
+        std::vector<Point> V;
         for (auto p : points_) {
             bool isBorder = false;
             if (p.x == 0 || p.x > 0 && img.at<uchar>(p.x-1, p.y) == 0) isBorder = true;
@@ -119,10 +128,10 @@ public:
     }
 };
 
-void flood_fill (cv::Mat& img, std::vector<cv::Point>& V, int x, int y) {
+void flood_fill (cv::Mat& img, std::vector<Point>& V, int x, int y) {
     if (img.at<uchar>(x,y) == 0) return;
     img.at<uchar>(x,y) = 0;
-    V.push_back(cv::Point(x,y));
+    V.push_back(Point(x,y));
     if (x > 0) flood_fill(img, V, x-1, y);
     if (x < img.rows - 1) flood_fill(img, V, x+1, y);
     if (y > 0) flood_fill(img, V, x, y-1);
@@ -135,7 +144,7 @@ std::vector<Segment> seg_image(cv::Mat& img) {
 
     for (int i = 0; i < img.rows; ++i) {
         for (int j = 0; j < img.cols; ++j) {
-            std::vector<cv::Point> V;
+            std::vector<Point> V;
             flood_fill(tmp, V, i, j);
             if (V.size() > 200) {
                 Segment s(V, img);
@@ -231,7 +240,6 @@ bool identify_condition(Segment& s) {
     return false;
 }
 
-// 0.18, 0.74
 void identify_segment(cv::Mat& img, cv::Mat& original_image, Segment& s) {
     if (identify_condition(s)) {
         draw_segment(s, original_image);
@@ -243,6 +251,7 @@ void process_image(cv::Mat& original_image) {
     threshold_image(img, 210);
     dilate(img, 5);
     erode(img, 3);
+    //cv::imshow("sdaf", img);
     std::vector<Segment> segments = seg_image(img);
     cv::cvtColor(img, img, cv::COLOR_GRAY2BGR);
 
@@ -272,7 +281,7 @@ void run_for_all_images() {
 }
 
 void run_for_test() {
-    std::string image_path = cv::samples::findFile("./images/pobr-input2-a.jpg");
+    std::string image_path = "./images/pobr-input8-a.jpg";
     cv::Mat img = cv::imread(image_path, cv::IMREAD_COLOR);
     if(img.empty()) {
         std::cout << "Could not read the image: " << image_path << std::endl;
@@ -284,8 +293,8 @@ void run_for_test() {
 } 
 
 int main() {
-    run_for_test();
-    //run_for_all_images();
+   //run_for_test();
+   run_for_all_images();
     int k = cv::waitKey(0); // Wait for a keystroke in the window
     return 0;
 }
