@@ -7,6 +7,8 @@
 #include <cmath>
 #include <set>
 #include <vector>
+#include "segment.h"
+#define MIN_AREA 200
 
 cv::Mat copy_image(cv::Mat& img) {
     cv::Mat tmp(img.size(), img.type());
@@ -18,141 +20,31 @@ cv::Mat copy_image(cv::Mat& img) {
     return tmp;
 }
 
-class Point {
-public:
-    int x;
-    int y;
-
-    Point () {}
-    Point(int x_, int y_) : x(x_), y(y_) {}
-};
-
-class Segment {
-public:
-    Segment(std::vector<Point> V, cv::Mat& img) : points_(V){
-        contour_ = get_contour(img);        
-        circle_moment_ = calc_circle_moment();
-        w0_ = W0();
-    }
-    
-    std::vector<Point> points_;
-    std::vector<Point> contour_;
-    double circle_moment_;
-    double w0_;
-
-    int area() {
-        return points_.size();
-    }
-
-    int get_min_x() {
-        int minValue = contour_[0].x;
-        for(auto p : contour_) {
-            if (p.x < minValue) {
-                minValue = p.x;
-            }
-        }
-        return minValue;
-    }
-
-    int get_max_x() {
-        int maxValue = contour_[0].x;
-        for(auto p : contour_) {
-            if (p.x > maxValue) {
-                maxValue = p.x;
-            }
-        }
-        return maxValue;
-    }
-
-    int get_min_y() {
-        int minValue = contour_[0].y;
-        for(auto p : contour_) {
-            if (p.y < minValue) {
-                minValue = p.y;
-            }
-        }
-        return minValue;
-    }
-
-    int get_max_y() {
-        int maxValue = contour_[0].y;
-        for(auto p : contour_) {
-            if (p.y > maxValue) {
-                maxValue = p.y;
-            }
-        }
-        return maxValue;
-    }
-
-    std::pair<Point, double> create_min_circle() {
-        Point center;
-
-        double max_distance = 0;
-        for (int i = 0; i < contour_.size(); ++i) {
-            for (int j = 0; j < contour_.size(); ++j) {
-
-                double distance = sqrt(pow(contour_[i].x - contour_[j].x, 2) + pow(contour_[i].y - contour_[j].y, 2));
-                if (max_distance < distance) {
-                    max_distance = distance;
-                    center.x = (contour_[i].x + contour_[j].x)/2;
-                    center.y = (contour_[i].y + contour_[j].y)/2;
-                }
-            }
-        }
-        return std::make_pair<Point, double>(Point(center.y, center.x), max_distance/2);
-    }
-
-    double calc_circle_moment() {
-        std::pair<Point, double> circle = create_min_circle();
-        return points_.size() / (M_PI * pow(circle.second,2));
-    }
-
-    std::vector<Point> get_contour(cv::Mat& img) {
-        std::vector<Point> V;
-        for (auto p : points_) {
-            bool isBorder = false;
-            if (p.x == 0 || p.x > 0 && img.at<uchar>(p.x-1, p.y) == 0) isBorder = true;
-            if (p.y == 0 || p.y > 0 && img.at<uchar>(p.x, p.y-1) == 0) isBorder = true;
-            if (p.x == img.rows - 1 || p.x < img.rows - 1 && img.at<uchar>(p.x + 1, p.y) == 0) isBorder = true;
-            if (p.y == img.rows - 1 || p.y < img.cols - 1 && img.at<uchar>(p.x, p.y + 1) == 0) isBorder = true;
-
-            if (isBorder) {
-                V.push_back(p);
-            }
-        }
-        return V;
-    }
-
-    long double W0() {
-        return contour_.size() / (2*sqrt(M_PI * points_.size())) - 1.0;
-    }
-};
-
-void flood_fill (cv::Mat& img, std::vector<Point>& V, int x, int y) {
+void flood_fill (cv::Mat& img, std::vector<Point>& points, int x, int y) {
     if (img.at<uchar>(x,y) == 0) return;
     img.at<uchar>(x,y) = 0;
-    V.push_back(Point(x,y));
-    if (x > 0) flood_fill(img, V, x-1, y);
-    if (x < img.rows - 1) flood_fill(img, V, x+1, y);
-    if (y > 0) flood_fill(img, V, x, y-1);
-    if (y < img.cols - 1) flood_fill(img, V, x, y+1);
+    points.push_back(Point(x,y));
+    if (x > 0) flood_fill(img, points, x-1, y);
+    if (x < img.rows - 1) flood_fill(img, points, x+1, y);
+    if (y > 0) flood_fill(img, points, x, y-1);
+    if (y < img.cols - 1) flood_fill(img, points, x, y+1);
 }
 
 std::vector<Segment> seg_image(cv::Mat& img) {
     cv::Mat tmp = copy_image(img);
-    std::vector<Segment> S;
+    std::vector<Segment> segments;
 
     for (int i = 0; i < img.rows; ++i) {
         for (int j = 0; j < img.cols; ++j) {
-            std::vector<Point> V;
-            flood_fill(tmp, V, i, j);
-            if (V.size() > 200) {
-                Segment s(V, img);
-                S.push_back(s);
+            std::vector<Point> points;
+            flood_fill(tmp, points, i, j);
+            if (points.size() > MIN_AREA) {
+                Segment s(points, img);
+                segments.push_back(s);
             }
         }
     } 
-    return S;
+    return segments;
 }
 
 void threshold_image(cv::Mat& img, int threshold) {
@@ -251,7 +143,6 @@ void process_image(cv::Mat& original_image) {
     threshold_image(img, 210);
     dilate(img, 5);
     erode(img, 3);
-    //cv::imshow("sdaf", img);
     std::vector<Segment> segments = seg_image(img);
     cv::cvtColor(img, img, cv::COLOR_GRAY2BGR);
 
@@ -262,10 +153,10 @@ void process_image(cv::Mat& original_image) {
 
 void run_for_all_images() {
     std::vector<std::string> files {
-        "./images/pobr-input2-a.jpg",
-        "./images/pobr-input5-a.jpg",
-        "./images/pobr-input7-a.jpg",
-        "./images/pobr-input8-a.jpg"
+        "./images/pobr-input2.jpg",
+        "./images/pobr-input5.jpg",
+        "./images/pobr-input7.jpg",
+        "./images/pobr-input8.jpg"
     };
 
     for (auto file : files) {
@@ -281,7 +172,7 @@ void run_for_all_images() {
 }
 
 void run_for_test() {
-    std::string image_path = "./images/pobr-input8-a.jpg";
+    std::string image_path = "./images/pobr-input2-a.jpg";
     cv::Mat img = cv::imread(image_path, cv::IMREAD_COLOR);
     if(img.empty()) {
         std::cout << "Could not read the image: " << image_path << std::endl;
@@ -293,8 +184,8 @@ void run_for_test() {
 } 
 
 int main() {
-   //run_for_test();
-   run_for_all_images();
+    //run_for_test();
+    run_for_all_images();
     int k = cv::waitKey(0); // Wait for a keystroke in the window
     return 0;
 }

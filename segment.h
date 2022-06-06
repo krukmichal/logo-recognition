@@ -12,7 +12,7 @@
 
 class Segment {
 public:
-    Segment(std::vector<Point> V, cv::Mat& img) : points_(V){
+    Segment(std::vector<Point>& points, cv::Mat& img) : points_(points){
         contour_ = get_contour(img);        
         circle_moment_ = calc_circle_moment();
         w0_ = W0();
@@ -91,7 +91,7 @@ public:
     }
 
     std::vector<Point> get_contour(cv::Mat& img) {
-        std::vector<Point> V;
+        std::vector<Point> contour;
         for (auto p : points_) {
             bool isBorder = false;
             if (p.x == 0 || p.x > 0 && img.at<uchar>(p.x-1, p.y) == 0) isBorder = true;
@@ -100,10 +100,10 @@ public:
             if (p.y == img.rows - 1 || p.y < img.cols - 1 && img.at<uchar>(p.x, p.y + 1) == 0) isBorder = true;
 
             if (isBorder) {
-                V.push_back(p);
+                contour.push_back(p);
             }
         }
-        return V;
+        return contour;
     }
 
     long double W0() {
